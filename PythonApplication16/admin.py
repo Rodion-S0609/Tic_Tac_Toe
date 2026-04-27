@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox, filedialog
 import base64
 from PIL import Image, ImageTk
 import io
+import os
 
 class ProfessionalAdminPanel:
     def __init__(self, sock):
@@ -44,39 +45,31 @@ class ProfessionalAdminPanel:
     def refresh(self):
         try:
             self.sock.send("GET_USERS".encode())
-            raw_data = self.sock.recv(1024 * 1000).decode()
+            raw_data = self.sock.recv(1024 * 1000).decode('utf-8', errors='ignore')
             self.tree.delete(*self.tree.get_children())
             if "USERS_LIST" in raw_data:
                 for u in raw_data.split("|")[1:]:
                     p = u.split(",")
-                    login = p[0]
-                    status = "АКТИВЕН" if p[1] == "1" else "ЗАБАНЕН"
-                    img_b64 = p[2] if len(p) > 2 else "None"
-                    
-                    self.tree.insert("", "end", values=(login, status))
-                    self.users_images[login] = img_b64
-        except Exception as e:
-            print(f"Ошибка обновления: {e}")
+                    if len(p) >= 3:
+                        login, status, img_b64 = p[0], p[1], p[2]
+                        st_text = "АКТИВЕН" if status == "1" else "ЗАБАНЕН"
+                        self.tree.insert("", "end", values=(login, st_text))
+                        self.users_images[login] = img_b64
+        except: pass
 
     def view_avatar(self):
         sel = self.tree.selection()
         if not sel: return
         target = self.tree.item(sel[0])['values'][0]
         img_b64 = self.users_images.get(target)
-
         if img_b64 and img_b64 != "None":
             top = tk.Toplevel()
-            top.title(f"Просмотр: {target}")
-            top.configure(bg="#1a1a1a")
-            try:
-                img_bytes = base64.b64decode(img_b64)
-                img = Image.open(io.BytesIO(img_bytes))
-                self.photo = ImageTk.PhotoImage(img)
-                tk.Label(top, image=self.photo, bg="#1a1a1a").pack(padx=10, pady=10)
-            except:
-                messagebox.showerror("Error", "Не удалось загрузить изображение")
-        else:
-            messagebox.showinfo("Система", "У этого пользователя нет аватара")
+            top.title(f"Avatar: {target}")
+            img_bytes = base64.b64decode(img_b64)
+            img = Image.open(io.BytesIO(img_bytes)).resize((200, 200))
+            self.tmp_img = ImageTk.PhotoImage(img)
+            tk.Label(top, image=self.tmp_img).pack()
+        else: messagebox.showinfo("Info", "Нет аватара")
 
     def send_file_dialog(self):
         sel = self.tree.selection()
@@ -84,7 +77,13 @@ class ProfessionalAdminPanel:
         path = filedialog.askopenfilename()
         if path:
             target = self.tree.item(sel[0])['values'][0]
-            self.sock.send(f"ADMIN_ACTION|SEND_FILE|{target}|{path}".encode())
+            try:
+                filename = os.path.basename(path)
+                with open(path, "rb") as f:
+                    file_data = base64.b64encode(f.read()).decode()
+                self.sock.send(f"ADMIN_ACTION|SEND_FILE|{target}|{filename}|{file_data}".encode())
+                messagebox.showinfo("Успех", f"Файл {filename} отправлен!")
+            except: messagebox.showerror("Ошибка", "Файл слишком велик или недоступен")
 
     def action(self, cmd):
         sel = self.tree.selection()
