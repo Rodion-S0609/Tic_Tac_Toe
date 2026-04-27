@@ -25,6 +25,7 @@
     <Compile Include="admin.py" />
     <Compile Include="client.py" />
     <Compile Include="db.py" />
+    <Compile Include="game.py" />
     <Compile Include="server.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
