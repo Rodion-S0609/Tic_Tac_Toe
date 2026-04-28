@@ -10,26 +10,34 @@ class TicTacToeClient:
         self.root.title("Авторизация")
         self.root.geometry("300x250")
         
-        tk.Label(self.root, text="LOGIN").pack()
+        tk.Label(self.root, text="ЛОГИН").pack()
         self.u = tk.Entry(self.root); self.u.pack()
-        tk.Label(self.root, text="PASSWORD").pack()
+        tk.Label(self.root, text="ПАРОЛЬ").pack()
         self.p = tk.Entry(self.root, show="*"); self.p.pack()
         tk.Button(self.root, text="ВОЙТИ", command=self.login).pack(pady=10)
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try: self.sock.connect(('127.0.0.1', 5556))
-        except: self.root.destroy()
+        except: 
+            messagebox.showerror("Ошибка", "Сервер недоступен")
+            self.root.destroy()
         self.root.mainloop()
 
     def login(self):
-        self.sock.send(f"LOGIN|{self.u.get()}|{self.p.get()}".encode())
-        res = self.sock.recv(1024 * 1000).decode().split("|")
-        if res[0] == "AUTH_OK":
-            role, user, avatar = res[1], res[2], res[3]
-            self.root.withdraw()
-            if role == "ADMIN": ProfessionalAdminPanel(self.sock)
-            else: TicTacToeGame(self.sock, user, avatar)
-        else: messagebox.showerror("Ошибка", "Вход запрещен")
+        try:
+            self.sock.send(f"LOGIN|{self.u.get()}|{self.p.get()}".encode())
+            res = self.sock.recv(1024 * 1000).decode().split("|")
+            if res[0] == "AUTH_OK":
+                role, user, avatar = res[1], res[2], res[3]
+                self.root.withdraw()
+                if role == "ADMIN":
+                    ProfessionalAdminPanel(self.sock)
+                else: 
+                    TicTacToeGame(self.sock, user, avatar)
+            else: 
+                messagebox.showerror("Ошибка", "Вход запрещен")
+        except: 
+            messagebox.showerror("Ошибка", "Потеряно соединение")
 
 if __name__ == "__main__":
     TicTacToeClient()

@@ -27,33 +27,33 @@ def client_handler(conn):
                     conn.send(f"AUTH_OK|{role}|{current_user}|{res[1] or 'None'}".encode())
                 else: conn.send("AUTH_ERR".encode())
 
-            elif cmd == "UPDATE_PROFILE":
-                db.update_profile(current_user, parts[1], parts[2])
-                clients[parts[1]] = clients.pop(current_user)
-                current_user = parts[1]
-
             elif cmd == "GET_USERS":
                 users = db.get_all_users()
                 u_list = [f"{u[0]},{u[1]},{u[2] if u[2] else 'None'}" for u in users]
-                conn.send(f"USERS_LIST|{'|'.join(u_list)}".encode())
+                history = db.get_match_history()
+                h_list = [f"{h[0]},{h[1]},{h[2]},{h[3]}" for h in history]
+                conn.send(f"DATA_UPDATE|{'|'.join(u_list)}# {'|'.join(h_list)}".encode())
 
             elif cmd == "ADMIN_ACTION":
                 act, target = parts[1], parts[2]
                 if act == "BAN": db.admin_toggle_ban(target)
-                elif target in clients:
+                if target in clients:
                     msg = f"REMOTE_CMD|{act}"
                     if act == "SEND_FILE": msg += f"|{parts[3]}|{parts[4]}"
                     clients[target].send(msg.encode())
                 conn.send("ACTION_OK".encode())
 
+            elif cmd == "GAME_OVER":
+                db.record_match(parts[1], parts[2], int(parts[3]))
+
             elif cmd == "FIND_GAME":
                 if waiting_player is None: waiting_player = (current_user, conn)
                 else:
                     opp_n, opp_c = waiting_player; waiting_player = None
-                    if random.choice([True, False]):
-                        conn.send("GAME_START|X".encode()); opp_c.send("GAME_START|O".encode())
-                    else:
-                        conn.send("GAME_START|O".encode()); opp_c.send("GAME_START|X".encode())
+                    sym = "X" if random.choice([True, False]) else "O"
+                    opp_sym = "O" if sym == "X" else "X"
+                    conn.send(f"GAME_START|{sym}|{opp_n}".encode())
+                    opp_c.send(f"GAME_START|{opp_sym}|{current_user}".encode())
 
             elif cmd == "MOVE":
                 for u, c in clients.items():
@@ -63,10 +63,11 @@ def client_handler(conn):
     conn.close()
 
 def main():
-    db.init_db(); s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    db.init_db()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((HOST, PORT)); s.listen(10)
-    print("SERVER ONLINE")
+    print("СЕРВЕР ЗАПУЩЕН")
     while True:
         conn, _ = s.accept()
         threading.Thread(target=client_handler, args=(conn,), daemon=True).start()

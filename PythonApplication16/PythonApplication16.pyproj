@@ -25,6 +25,7 @@
     <Compile Include="admin.py" />
     <Compile Include="client.py" />
     <Compile Include="db.py" />
+    <Compile Include="fix_admin.py" />
     <Compile Include="game.py" />
     <Compile Include="server.py" />
   </ItemGroup>
