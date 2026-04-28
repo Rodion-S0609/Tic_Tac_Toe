@@ -4,15 +4,18 @@ from datetime import datetime
 
 DB_NAME = 'users.db'
 
+# Инициализация базы данных: создание таблиц и первичного администратора
 def init_db():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
+        # Таблица пользователей: логин, хэш пароля, аватар и статус (бан/разбан)
         cursor.execute('''CREATE TABLE IF NOT EXISTS users 
                           (Id INTEGER PRIMARY KEY AUTOINCREMENT, 
                            Login TEXT UNIQUE, 
                            Password_hash TEXT, 
                            Image TEXT, 
                            status INTEGER DEFAULT 1)''')
+        # Таблица матчей: победитель, проигравший, флаг ничьи и время
         cursor.execute('''CREATE TABLE IF NOT EXISTS matches 
                           (Id INTEGER PRIMARY KEY AUTOINCREMENT, 
                            Winner TEXT, 
@@ -20,11 +23,13 @@ def init_db():
                            Draw INTEGER DEFAULT 0,
                            Timestamp DATETIME)''')
         
+        # Создание стандартного админа, если его еще нет
         admin_pass = hashlib.sha256('admin123'.encode()).hexdigest()
         cursor.execute("INSERT OR IGNORE INTO users (Login, Password_hash, status) VALUES (?, ?, ?)", 
                        ('admin_main_office', admin_pass, 1))
         conn.commit()
 
+# Проверка учетных данных при входе
 def login_user(login, password):
     hashed = hashlib.sha256(password.encode()).hexdigest()
     with sqlite3.connect(DB_NAME) as conn:
@@ -32,6 +37,7 @@ def login_user(login, password):
         cursor.execute("SELECT Login, Image, status FROM users WHERE Login=? AND Password_hash=?", (login, hashed))
         return cursor.fetchone()
 
+# Обновление данных профиля (логин и аватар)
 def update_profile(old_login, new_login, img_base64):
     with sqlite3.connect(DB_NAME) as conn:
         if img_base64:
@@ -40,22 +46,26 @@ def update_profile(old_login, new_login, img_base64):
             conn.execute("UPDATE users SET Login = ? WHERE Login = ?", (new_login, old_login))
         conn.commit()
 
+# Получение списка всех пользователей для админ-панели
 def get_all_users():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT Login, status, Image FROM users")
         return cursor.fetchall()
 
+# Переключение статуса бана пользователя (1 -> 0 или 0 -> 1)
 def admin_toggle_ban(login):
     with sqlite3.connect(DB_NAME) as conn:
         conn.execute("UPDATE users SET status = 1 - status WHERE Login = ?", (login,))
 
+# Запись результата завершенной игры
 def record_match(winner, loser, is_draw=0):
     with sqlite3.connect(DB_NAME) as conn:
         conn.execute("INSERT INTO matches (Winner, Loser, Draw, Timestamp) VALUES (?, ?, ?, ?)",
                      (winner, loser, is_draw, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         conn.commit()
 
+# Получение всей истории игр
 def get_match_history():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()

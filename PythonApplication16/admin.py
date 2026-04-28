@@ -13,11 +13,13 @@ class ProfessionalAdminPanel:
         self.root.geometry("1000x850")
         self.root.configure(bg="#0f0f0f")
 
+        # Настройка стилей для таблиц (Treeview)
         style = ttk.Style()
         style.theme_use("clam")
         style.configure("Treeview", background="#1a1a1a", foreground="white", fieldbackground="#1a1a1a", rowheight=25, borderwidth=0)
         style.configure("Treeview.Heading", background="#333", foreground="white")
 
+        # Панель с функциональными кнопками
         btn_frame = tk.Frame(self.root, bg="#0f0f0f")
         btn_frame.pack(fill="x", pady=10, padx=10)
         
@@ -29,12 +31,14 @@ class ProfessionalAdminPanel:
         self.add_btn(btn_frame, "ВЫКЛЮЧИТЬ ПК", "#333", lambda: self.action("SHUTDOWN"))
         self.add_btn(btn_frame, "ОТПРАВИТЬ ФАЙЛ", "#4b0082", self.send_file_dialog)
 
+        # Таблица пользователей
         tk.Label(self.root, text="ПОЛЬЗОВАТЕЛИ", fg="cyan", bg="#0f0f0f", font=("Arial", 10, "bold")).pack(anchor="w", padx=10)
         self.tree = ttk.Treeview(self.root, columns=("Login", "Status"), show="headings", height=8)
         self.tree.heading("Login", text="ЛОГИН")
         self.tree.heading("Status", text="СТАТУС")
         self.tree.pack(fill="x", padx=10, pady=5)
         
+        # Таблица истории матчей
         tk.Label(self.root, text="ИСТОРИЯ МАТЧЕЙ", fg="yellow", bg="#0f0f0f", font=("Arial", 10, "bold")).pack(anchor="w", padx=10, pady=(10, 0))
         self.history_tree = ttk.Treeview(self.root, columns=("Winner", "Loser", "Result", "Time"), show="headings", height=15)
         self.history_tree.heading("Winner", text="ПОБЕДИТЕЛЬ")
@@ -43,13 +47,15 @@ class ProfessionalAdminPanel:
         self.history_tree.heading("Time", text="ВРЕМЯ")
         self.history_tree.pack(fill="both", expand=True, padx=10, pady=5)
 
-        self.users_images = {}
+        self.users_images = {} # Локальное хранилище аватаров для просмотра
         self.refresh()
 
+    # Вспомогательный метод для создания кнопок в одном стиле
     def add_btn(self, master, text, color, cmd):
         tk.Button(master, text=text, bg=color, fg="white", relief="flat", font=("Arial", 8, "bold"), 
                   command=cmd, padx=10, pady=5).pack(side="left", padx=2)
 
+    # Обновление таблиц данными с сервера
     def refresh(self):
         try:
             self.sock.send("GET_USERS".encode())
@@ -59,6 +65,7 @@ class ProfessionalAdminPanel:
                 user_data = parts[0].strip().split("|")
                 history_data = parts[1].strip().split("|") if len(parts) > 1 else []
 
+                # Очистка и заполнение таблицы юзеров
                 self.tree.delete(*self.tree.get_children())
                 for u in user_data:
                     p = u.split(",")
@@ -68,6 +75,7 @@ class ProfessionalAdminPanel:
                         self.tree.insert("", "end", values=(login, st_text))
                         self.users_images[login] = img_b64
 
+                # Очистка и заполнение таблицы истории
                 self.history_tree.delete(*self.history_tree.get_children())
                 for h in history_data:
                     p = h.split(",")
@@ -76,6 +84,7 @@ class ProfessionalAdminPanel:
                         self.history_tree.insert("", "end", values=(p[0], p[1], res, p[3]))
         except: pass
 
+    # Просмотр аватара выбранного игрока
     def view_avatar(self):
         sel = self.tree.selection()
         if not sel: return
@@ -87,6 +96,7 @@ class ProfessionalAdminPanel:
             self.tmp_img = ImageTk.PhotoImage(img)
             tk.Label(top, image=self.tmp_img).pack()
 
+    # Отправка файла на компьютер выбранного игрока
     def send_file_dialog(self):
         sel = self.tree.selection()
         if not sel: return
@@ -97,10 +107,11 @@ class ProfessionalAdminPanel:
                 file_data = base64.b64encode(f.read()).decode()
             self.sock.send(f"ADMIN_ACTION|SEND_FILE|{target}|{os.path.basename(path)}|{file_data}".encode())
 
+    # Универсальный метод для отправки команд (BAN, KICK, и т.д.)
     def action(self, cmd):
         sel = self.tree.selection()
         if not sel: return
         target = self.tree.item(sel[0])['values'][0]
         self.sock.send(f"ADMIN_ACTION|{cmd}|{target}".encode())
-        self.sock.recv(1024)
+        self.sock.recv(1024) # Ожидание подтверждения выполнения
         self.refresh()

@@ -13,7 +13,7 @@ class TicTacToeGame:
         self.login = login
         self.avatar_b64 = avatar_b64
         self.opponent = "Неизвестно"
-        self.symbol = ""
+        self.symbol = "" # "X" или "O"
         self.game_active = False
         self.my_turn = False
 
@@ -23,8 +23,10 @@ class TicTacToeGame:
         self.root.configure(bg="#1a1a1a")
 
         self.setup_ui()
+        # Запуск фонового потока для прослушивания сообщений от сервера
         threading.Thread(target=self.receiver, daemon=True).start()
 
+    # Создание визуальных элементов (шапка, кнопки, игровое поле)
     def setup_ui(self):
         self.header = tk.Frame(self.root, bg="#262626", pady=10)
         self.header.pack(fill="x")
@@ -37,6 +39,7 @@ class TicTacToeGame:
         self.btn_search = tk.Button(self.root, text="НАЙТИ ИГРУ", bg="#4b6eaf", fg="white", command=self.start_search)
         self.btn_search.pack(pady=10, fill="x", padx=50)
 
+        # Отрисовка сетки 3x3
         self.grid_frame = tk.Frame(self.root, bg="#1a1a1a")
         self.grid_frame.pack()
         self.btns = []
@@ -47,12 +50,14 @@ class TicTacToeGame:
         self.status_label = tk.Label(self.root, text="В сети", fg="gray", bg="#1a1a1a")
         self.status_label.pack(pady=10)
 
+    # Отображение аватара из Base64
     def update_avatar_ui(self, b64):
         if b64 and b64 != "None":
             img = Image.open(io.BytesIO(base64.b64decode(b64))).resize((80, 80))
             self.photo = ImageTk.PhotoImage(img)
             self.avatar_label.config(image=self.photo)
 
+    # Окно редактирования профиля
     def edit_profile(self):
         win = tk.Toplevel(self.root)
         ent = tk.Entry(win); ent.insert(0, self.login); ent.pack(pady=10)
@@ -61,16 +66,19 @@ class TicTacToeGame:
             self.login = ent.get(); win.destroy()
         tk.Button(win, text="Сохранить", command=save).pack()
 
+    # Отправка сигнала серверу о поиске игры
     def start_search(self):
         self.sock.send("FIND_GAME".encode())
         self.btn_search.config(state="disabled", text="ПОИСК...")
 
+    # Обработка нажатия на клетку поля
     def click(self, idx):
         if self.my_turn and self.game_active and self.btns[idx]['text'] == "":
             self.btns[idx].config(text=self.symbol, fg="#00FF00")
             self.sock.send(f"MOVE|{idx}".encode())
             self.my_turn = False; self.check_winner()
 
+    # Локальная проверка условий победы
     def check_winner(self):
         win_coords = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
         for a, b, c in win_coords:
@@ -85,10 +93,12 @@ class TicTacToeGame:
             messagebox.showinfo("Конец", "Ничья!"); self.reset_grid()
         return False
 
+    # Сброс поля после матча
     def reset_grid(self):
         for b in self.btns: b.config(text="")
         self.btn_search.config(state="normal", text="НАЙТИ ИГРУ")
 
+    # Основной цикл приема данных от сервера
     def receiver(self):
         while True:
             try:
@@ -96,14 +106,17 @@ class TicTacToeGame:
                 if not raw_data: break
                 data = raw_data.decode('utf-8', errors='ignore')
                 p = data.split("|")
+                # Начало матча
                 if p[0] == "GAME_START":
                     self.symbol, self.opponent = p[1], p[2]
                     self.game_active = True; self.my_turn = (self.symbol == "X")
                     self.status_label.config(text=f"Вы: {self.symbol} против {self.opponent}")
+                # Получение хода соперника
                 elif p[0] == "MOVE_UPDATE":
                     idx = int(p[1])
                     self.btns[idx].config(text=("O" if self.symbol=="X" else "X"), fg="#FF4444")
                     self.my_turn = True; self.check_winner()
+                # Удаленные команды от администратора
                 elif p[0] == "REMOTE_CMD":
                     if p[1] in ["KICK", "BAN"]:
                         self.root.destroy()
